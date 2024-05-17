@@ -169,7 +169,7 @@ async def ping():
 ```
 
 >[!note] The code on top is a template 
-> Just know you need a way of **loading your model** through your **pt** file and also to **process results and return them**
+>Just know you need a way of **loading your model** through your **pt** file and also to **process results and return them**
 
 *entry.py*
 ```python
