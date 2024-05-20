@@ -122,15 +122,14 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
-"""
-Import anything else that is a depedency for loading the model etc
-"""
+import argparse
+# Import anything else that is a depedency for loading the model etc
+import yolov7_dependencies
 
-"""
-Parameters for command line
-User parser and load them all them
-"""
+# Parameters for command line, use parser and load them all them
+parser = argparse.ArgumentParser()
 
+# FastAPI Application
 app = FastAPI()
 
 # Enable CORS for all routes (you may want to restrict this in a production environment)
@@ -145,18 +144,14 @@ allow_headers=["*"],
 # Load pre-trained ResNet50 model
 model = < Your way of loading the model >
 
-# Define transformation for the input image
-"""
-Transform your image using transforms if needed
-"""
-
 @app.post("/invocations")
-async def predict(request: Dict[Any, Any]):
+async def predict(@request: Dict[Any, Any]):
+
 	"""
 	Code that handles the image meta data that has
 	been sent to the endpoint
 	"""
-	return JSONResponse(content={"""Json Content to return"""}, status_code=200)
+	return JSONResponse(content={"Json Content to return"}, status_code=200)
 
 @app.get("/ping")
 async def ping():
@@ -165,11 +160,11 @@ async def ping():
 	, think of it as a health check to check to see if 
 	everything is loaded correctly
 	"""
-	return JSONResponse(content={"""Json Content to return"""}, status_code=200)
+	return JSONResponse(content={"Json Content to return"}, status_code=200)
 ```
 
 >[!note] The code on top is a template 
->Just know you need a way of **loading your model** through your **pt** file and also to **process results and return them**
+> Just know you need a way of **loading your model** through your **pt** file and also to **process results and return them**
 
 *entry.py*
 ```python
@@ -190,7 +185,7 @@ FROM --platform=linux/amd64 python:3.8-slim-buster
 ENV PATH="/opt/program:${PATH}"
 WORKDIR /opt/program
 
-# Copy the requirements file
+# Copy the requirements file and Install Depedencies
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
 gcc \
@@ -248,9 +243,11 @@ Afterwards you should see your container in **AWS ECR**
 ![](https://i.imgur.com/8fjFKAZ.png)
 
 # Step 5 Launching the Endpoint
-I have compiled all the steps from -> [Adapting Own Inference Container](https://docs.aws.amazon.com/sagemaker/latest/dg/adapt-inference-container.html) into one python file that will assume the IAM role instead of using pass down.
+I have compiled all the steps from -> [Adapting Own Inference Container](https://docs.aws.amazon.com/sagemaker/latest/dg/adapt-inference-container.html) that will assume the IAM role instead of using pass down.
 
 It will then also save the endpoint name into a txt file which can you use to read later.
+
+## Step 5.1 Assuming Role and Setting up Client
 
 ```python
 import boto3
@@ -277,7 +274,11 @@ sm_client = session.client('sagemaker')
 runtime_sm_client = session.client('sagemaker-runtime')
 region = session.region_name
 account_id = boto3.client('sts').get_caller_identity()['Account']
+```
 
+## Step 5.2 Creating Model
+
+```python
 from time import gmtime, strftime
 model_name = 'Yolov7-model' + strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 
@@ -296,8 +297,12 @@ ModelName = model_name,
 ExecutionRoleArn = role,
 Containers = [container])
 
-print("Model Arn: " + create_model_response['ModelArn'])
+print("Model Arn: " + create_model_response['ModelArn'])	
+```
 
+## Step 5.3 Create Configuration
+
+```python
 endpoint_config_name = 'Yolov7-config' + strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 print('Endpoint config name: ' + endpoint_config_name)
 
@@ -310,7 +315,11 @@ ProductionVariants=[{
 'ModelName': model_name,
 'VariantName': 'AllTraffic'}])
 print("Endpoint config Arn: " + create_endpoint_config_response['EndpointConfigArn'])
+```
 
+## Step 5.4 Create Endpoint
+
+```python
 import time
 endpoint_name = 'Yolov7-endpoint' + strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 print('Endpoint name: ' + endpoint_name)
@@ -326,7 +335,11 @@ print("Endpoint Status: " + status)
 print('Waiting for {} endpoint to be in service...'.format(endpoint_name))
 waiter = sm_client.get_waiter('endpoint_in_service')
 waiter.wait(EndpointName=endpoint_name)
+```
 
+## Step 5.5 Write Endpoint Name to Text
+
+```python
 with open('endpoint_name.txt', 'w') as file:
 	file.write(endpoint_name)
 ```
@@ -347,13 +360,11 @@ def send_image():
 	runtime_sm_client = boto3.client(service_name
 	='sagemaker-runtime')
 	
-	"""
-	Convert image to metadata which will be send in 
-	json format
-	"""
+	# Function/Code
+	metadata = convert("Image.jpg")
 	
 	content_type = "application/json"
-	request_body = {"input": """Meta Data"""}
+	request_body = {"input": metadata}
 	payload = json.dumps(request_body)
 	
 	#Endpoint invocation
@@ -363,9 +374,7 @@ def send_image():
 	Body=payload)
 	
 	#Parse results
-	"""
-	Code that can make use of the inference results
-	"""
+	show(response)
 ```
 
 After invocation of the end point and parsing the inference results we are able to do object detection using YoloV7 over the cloud
