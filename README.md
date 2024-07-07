@@ -69,7 +69,7 @@ After verifying the installation and the being able to run the `aws` command we 
 
 *Universal*
 ```bash
-aws configure
+sudo aws configure
 AWS Access Key ID []: <Your Key>
 AWS Secret Access Key []: <Your Key>
 Default region name []: <The region you want to deploy the endpoint>
